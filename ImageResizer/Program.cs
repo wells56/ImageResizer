@@ -20,7 +20,9 @@ namespace ImageResizer
 
             Stopwatch sw = new Stopwatch();
             sw.Start();
-            imageProcess.ResizeImages(sourcePath, destinationPath, 2.0);
+            //imageProcess.ResizeImages(sourcePath, destinationPath, 2.0);
+            Task task = imageProcess.ResizeImagesAsync(sourcePath, destinationPath, 2.0);
+            task.Wait();
             sw.Stop();
 
             Console.WriteLine($"花費時間: {sw.ElapsedMilliseconds} ms");

@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ImageResizer
 {
@@ -38,6 +41,7 @@ namespace ImageResizer
         public void ResizeImages(string sourcePath, string destPath, double scale)
         {
             var allFiles = FindImages(sourcePath);
+            Console.WriteLine(allFiles.Count);
             foreach (var filePath in allFiles)
             {
                 Image imgPhoto = Image.FromFile(filePath);
@@ -56,6 +60,47 @@ namespace ImageResizer
                 string destFile = Path.Combine(destPath, imgName + ".jpg");
                 processedImage.Save(destFile, ImageFormat.Jpeg);
             }
+        }
+
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        {
+            var allFiles = FindImages(sourcePath);
+            Console.WriteLine(allFiles.Count);
+
+            var tasks = new List<Task>();
+            foreach (var filePath in allFiles)
+            {
+                tasks.Add(Task.Run(async () =>
+                {
+                    asyncProcess(filePath, destPath, scale);
+                }));
+
+            }
+            await Task.WhenAll(tasks);
+        }
+
+        private void asyncProcess(string filePath, string destPath, double scale)//, Image imgPhoto,    int sourceWidth, int sourceHeight,    int destionatonWidth, int destionatonHeight)
+        {
+            Image imgPhoto = Image.FromFile(filePath);
+            string imgName = Path.GetFileNameWithoutExtension(filePath);
+
+            int sourceWidth = imgPhoto.Width;
+            int sourceHeight = imgPhoto.Height;
+
+            int destionatonWidth = (int)(sourceWidth * scale);
+            int destionatonHeight = (int)(sourceHeight * scale);
+
+            var tid = String.Format("{0:D2}", Thread.CurrentThread.ManagedThreadId);
+
+            Console.WriteLine(tid + " start process img: " + imgName);
+            Bitmap processedImage = processBitmap((Bitmap)imgPhoto, sourceWidth, sourceHeight, destionatonWidth, destionatonHeight);
+            Console.WriteLine(tid + " end process img: " + imgName);
+
+            string destFile = Path.Combine(destPath, imgName + ".jpg");
+
+            Console.WriteLine(tid + " start save img: " + imgName);
+            processedImage.Save(destFile, ImageFormat.Jpeg);
+            Console.WriteLine(tid + " end save img: " + imgName);
         }
 
         /// <summary>
@@ -82,6 +127,20 @@ namespace ImageResizer
         /// <param name="newHeight">新圖片的高度</param>
         /// <returns></returns>
         Bitmap processBitmap(Bitmap img, int srcWidth, int srcHeight, int newWidth, int newHeight)
+        {
+            Bitmap resizedbitmap = new Bitmap(newWidth, newHeight);
+            Graphics g = Graphics.FromImage(resizedbitmap);
+            g.InterpolationMode = InterpolationMode.High;
+            g.SmoothingMode = SmoothingMode.HighQuality;
+            g.Clear(Color.Transparent);
+            g.DrawImage(img,
+                new Rectangle(0, 0, newWidth, newHeight),
+                new Rectangle(0, 0, srcWidth, srcHeight),
+                GraphicsUnit.Pixel);
+            return resizedbitmap;
+        }
+
+        private async Task<Bitmap> processBitmapAsync(Bitmap img, int srcWidth, int srcHeight, int newWidth, int newHeight)
         {
             Bitmap resizedbitmap = new Bitmap(newWidth, newHeight);
             Graphics g = Graphics.FromImage(resizedbitmap);
