@@ -62,7 +62,7 @@ namespace ImageResizer
             }
         }
 
-        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        public async Task ResizeImagesAsyncCanceled(string sourcePath, string destPath, double scale, CancellationToken token)
         {
             var allFiles = FindImages(sourcePath);
             Console.WriteLine(allFiles.Count);
@@ -72,14 +72,26 @@ namespace ImageResizer
             {
                 tasks.Add(Task.Run(async () =>
                 {
-                    asyncProcess(filePath, destPath, scale);
+                    asyncProcess(filePath, destPath, scale, token);
                 }));
 
             }
             await Task.WhenAll(tasks);
+
+            // 取消時刪除圖片
+            if (token.IsCancellationRequested == true)
+            {
+                Clean(destPath);
+                Console.WriteLine("Clean");
+            }
         }
 
-        private void asyncProcess(string filePath, string destPath, double scale)//, Image imgPhoto,    int sourceWidth, int sourceHeight,    int destionatonWidth, int destionatonHeight)
+        public async Task ResizeImagesAsync(string sourcePath, string destPath, double scale)
+        {
+            ResizeImagesAsyncCanceled(sourcePath, destPath, scale, CancellationToken.None);
+        }
+
+        private void asyncProcess(string filePath, string destPath, double scale, CancellationToken token)
         {
             Image imgPhoto = Image.FromFile(filePath);
             string imgName = Path.GetFileNameWithoutExtension(filePath);
@@ -91,6 +103,13 @@ namespace ImageResizer
             int destionatonHeight = (int)(sourceHeight * scale);
 
             var tid = String.Format("{0:D2}", Thread.CurrentThread.ManagedThreadId);
+
+            // 在processBitmap前中斷Task
+            if (token.IsCancellationRequested == true)
+            {
+                Console.WriteLine("cancel thread:"+ tid);
+                return;
+            }
 
             Console.WriteLine(tid + " start process img: " + imgName);
             Bitmap processedImage = processBitmap((Bitmap)imgPhoto, sourceWidth, sourceHeight, destionatonWidth, destionatonHeight);
